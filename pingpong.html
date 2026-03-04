@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You vs AI</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body { 
+      background: #222; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      min-height: 100vh;
+      font-family: monospace;
+    }
+    
+    #container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    canvas { 
+      background: #000; 
+      display: block;
+      border: 2px solid #444;
+      max-width: 95vw;
+      max-height: 85vh;
+    }
+    
+    #scoreboard {
+      color: #fff;
+      text-align: center;
+      font-family: monospace;
+      letter-spacing: 2px;
+      font-size: clamp(16px, 4vw, 32px);
+    }
+
+    /* Menu Styles */
+    #menu {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 40px;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      padding: 20px;
+    }
+
+    #menu.hidden {
+      display: none;
+    }
+
+    .menu-title {
+      font-size: clamp(32px, 8vw, 64px);
+      color: #0f0;
+      text-shadow: 0 0 20px #0f0;
+      letter-spacing: 3px;
+      text-align: center;
+    }
+
+    .difficulty-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      max-width: 1000px;
+      width: 100%;
+    }
+
+    .difficulty-btn {
+      padding: 25px;
+      font-size: 18px;
+      font-weight: bold;
+      border: 3px solid #444;
+      background: #1a1a1a;
+      color: #fff;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      min-height: 140px;
+      justify-content: center;
+    }
+
+    .difficulty-btn:hover {
+      transform: scale(1.05);
+      border-color: #fff;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+    }
+
+    .difficulty-btn.level-1 {
+      border-color: #00ff00;
+    }
+
+    .difficulty-btn.level-1:hover {
+      background: #001a00;
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+    }
+
+    .difficulty-btn.level-2 {
+      border-color: #ffff00;
+    }
+
+    .difficulty-btn.level-2:hover {
+      background: #1a1a00;
+      box-shadow: 0 0 20px rgba(255, 255, 0, 0.5);
+    }
+
+    .difficulty-btn.level-3 {
+      border-color: #ff6600;
+    }
+
+    .difficulty-btn.level-3:hover {
+      background: #1a0a00;
+      box-shadow: 0 0 20px rgba(255, 102, 0, 0.5);
+    }
+
+    .difficulty-btn.level-4 {
+      border-color: #ff0000;
+    }
+
+    .difficulty-btn.level-4:hover {
+      background: #1a0000;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+    }
+
+    .difficulty-title {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+
+    .difficulty-description {
+      font-size: 14px;
+      color: #aaa;
+      text-align: center;
+    }
+
+    #gameContainer {
+      display: none;
+    }
+
+    #gameContainer.active {
+      display: flex;
+    }
+
+    .difficulty-info {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #fff;
+      font-size: 16px;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Menu -->
+  <div id="menu">
+    <div class="menu-title">You vs AI</div>
+    <div class="difficulty-buttons">
+      <button class="difficulty-btn level-1" data-level="1">
+        <div class="difficulty-title">🟢 PUSSY</div>
+        <div class="difficulty-description">Easy AI, very slow ball</div>
+      </button>
+      <button class="difficulty-btn level-2" data-level="2">
+        <div class="difficulty-title">🟡 MEDIUM</div>
+        <div class="difficulty-description">Balanced gameplay</div>
+      </button>
+      <button class="difficulty-btn level-3" data-level="3">
+        <div class="difficulty-title">🟠 HARD</div>
+        <div class="difficulty-description">Challenging AI</div>
+      </button>
+      <button class="difficulty-btn level-4" data-level="4">
+        <div class="difficulty-title">🔴 EXPERT</div>
+        <div class="difficulty-description">Insane difficulty</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Game Container -->
+  <div id="gameContainer">
+    <div class="difficulty-info" id="difficultyInfo"></div>
+    <div id="container">
+      <div id="scoreboard">Player: 0 &nbsp;&nbsp;|&nbsp;&nbsp; AI: 0</div>
+      <canvas id="pong"></canvas>
+    </div>
+  </div>
+  
+  <script>
+    // Difficulty level configurations
+    const DIFFICULTY_LEVELS = {
+      1: {
+        name: 'PUSSY',
+        aiPrecision: 0.25,
+        aiSpeed: 3,
+        aiMaxPrecision: 0.40,
+        aiMaxSpeed: 3.5,
+        ballSpeedMultiplier: 0.8,
+        rallyAcceleration: 0.015,
+        description: 'PUSSY'
+      },
+      2: {
+        name: 'MEDIUM',
+        aiPrecision: 0.65,
+        aiSpeed: 6,
+        aiMaxPrecision: 0.80,
+        aiMaxSpeed: 7,
+        ballSpeedMultiplier: 1.5,
+        rallyAcceleration: 0.05,
+        description: 'MEDIUM'
+      },
+      3: {
+        name: 'HARD',
+        aiPrecision: 0.80,
+        aiSpeed: 9,
+        aiMaxPrecision: 0.95,
+        aiMaxSpeed: 9,
+        ballSpeedMultiplier: 1.9,
+        rallyAcceleration: 0.08,
+        description: 'HARD'
+      },
+      4: {
+        name: 'EXPERT',
+        aiPrecision: 0.95,
+        aiSpeed: 11,
+        aiMaxPrecision: 1.0,
+        aiMaxSpeed: 12,
+        ballSpeedMultiplier: 2.5,
+        rallyAcceleration: 0.12,
+        description: 'EXPERT'
+      }
+    };
+
+    // Menu functionality
+    const menu = document.getElementById('menu');
+    const gameContainer = document.getElementById('gameContainer');
+    const difficultyButtons = document.querySelectorAll('.difficulty-btn');
+    const difficultyInfo = document.getElementById('difficultyInfo');
+    let currentDifficulty = null;
+
+    difficultyButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        currentDifficulty = parseInt(this.dataset.level);
+        startGame(currentDifficulty);
+      });
+    });
+
+    function startGame(level) {
+      menu.classList.add('hidden');
+      gameContainer.classList.add('active');
+      difficultyInfo.textContent = `Level: ${DIFFICULTY_LEVELS[level].description}`;
+      initializeGame(level);
+    }
+
+    function backToMenu() {
+      menu.classList.remove('hidden');
+      gameContainer.classList.remove('active');
+      currentDifficulty = null;
+      // Stop the game loop if needed
+      if (gameLoopId) {
+        cancelAnimationFrame(gameLoopId);
+        gameLoopId = null;
+      }
+    }
+
+    // Canvas and context
+    const canvas = document.getElementById('pong');
+    const ctx = canvas.getContext('2d');
+    const scoreboard = document.getElementById('scoreboard');
+
+    // Base reference size for proportional scaling
+    const BASE_WIDTH = 700;
+    const BASE_HEIGHT = 400;
+    const ASPECT_RATIO = BASE_WIDTH / BASE_HEIGHT;
+
+    let gameLoopId = null;
+    let isGameRunning = false;
+
+    // Game state
+    let gameState = {
+      width: BASE_WIDTH,
+      height: BASE_HEIGHT,
+      paddleWidth: 10,
+      paddleHeight: 80,
+      ballSize: 12,
+      playerX: 16,
+      aiX: 0,
+      difficulty: 1
+    };
+
+    let player = { y: 0, score: 0 };
+    let ai = {
+      y: 0,
+      score: 0,
+      precision: 0.70,
+      speed: 5,
+      maxPrecision: 0.80,
+      maxSpeed: 7
+    };
+    let ball = {
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      speed: 2.9
+    };
+
+    let lastTouchBy = null, rally = 0;
+    let ballSpeedMultiplier = 1.7;
+    let rallyAcceleration = 0.05;
+
+    function initializeGame(level) {
+      gameState.difficulty = level;
+      const config = DIFFICULTY_LEVELS[level];
+      
+      // Set AI configuration based on difficulty
+      ai.precision = config.aiPrecision;
+      ai.speed = config.aiSpeed;
+      ai.maxPrecision = config.aiMaxPrecision;
+      ai.maxSpeed = config.aiMaxSpeed;
+      
+      ballSpeedMultiplier = config.ballSpeedMultiplier;
+      rallyAcceleration = config.rallyAcceleration;
+      
+      // Reset scores
+      player.score = 0;
+      ai.score = 0;
+      scoreboard.textContent = `Player: 0  |  AI: 0`;
+      
+      // Setup canvas and start game
+      isGameRunning = true;
+      resizeCanvas();
+      
+      if (gameLoopId) {
+        cancelAnimationFrame(gameLoopId);
+      }
+      
+      loop();
+    }
+
+    // Responsive canvas sizing
+    function resizeCanvas() {
+      const maxWidth = window.innerWidth * 0.96;
+      const maxHeight = window.innerHeight * 0.8;
+      
+      let newWidth = maxWidth;
+      let newHeight = newWidth / ASPECT_RATIO;
+      
+      if (newHeight > maxHeight) {
+        newHeight = maxHeight;
+        newWidth = newHeight * ASPECT_RATIO;
+      }
+      
+      canvas.width = Math.floor(newWidth);
+      canvas.height = Math.floor(newHeight);
+      
+      // Update game state dimensions
+      gameState.width = canvas.width;
+      gameState.height = canvas.height;
+      gameState.paddleWidth = canvas.width * 0.0143;
+      gameState.paddleHeight = canvas.height * 0.2;
+      gameState.ballSize = canvas.width * 0.0171;
+      gameState.playerX = canvas.width * 0.0229;
+      gameState.aiX = canvas.width - gameState.paddleWidth - canvas.width * 0.0229;
+      
+      // Reset paddle positions to center
+      player.y = (canvas.height - gameState.paddleHeight) / 2;
+      ai.y = (canvas.height - gameState.paddleHeight) / 2;
+      
+      // Reset ball
+      resetBall('player');
+    }
+
+    function resetBall(winner) {
+      const W = gameState.width;
+      const H = gameState.height;
+      
+      const baseSpeed = 2.9 * ballSpeedMultiplier;
+      const speedVariation = 0.6 * ballSpeedMultiplier;
+      
+      ball.x = W / 2 - gameState.ballSize / 2;
+      ball.y = H / 2 - gameState.ballSize / 2;
+      ball.vx = (winner === 'ai' ? -1 : 1) * (baseSpeed + Math.random() * speedVariation);
+      ball.vy = (Math.random() * 2.5 * ballSpeedMultiplier) - (1.25 * ballSpeedMultiplier);
+      ball.speed = baseSpeed + Math.random() * speedVariation;
+      rally = 0;
+    }
+
+    function drawRect(x, y, w, h, color = '#fff') {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, w, h);
+    }
+
+    function drawNet() {
+      const W = gameState.width;
+      const H = gameState.height;
+      const netGap = H * 0.0475;
+      const netHeight = H * 0.03;
+      
+      for (let y = netGap; y < H; y += netGap * 2.375) {
+        drawRect(W / 2 - 2, y, 4, netHeight, '#444');
+      }
+    }
+
+    function aiMove() {
+      const W = gameState.width;
+      const H = gameState.height;
+      const PADDLE_H = gameState.paddleHeight;
+      
+      let targetY = ball.y - (PADDLE_H / 2 - gameState.ballSize / 2);
+
+      if (Math.random() > ai.precision) {
+        targetY += ((Math.random() - 0.5) * (H * 0.2));
+      }
+
+      // Smooth follow when ball is moving toward AI
+      if (ball.vx > 0) {
+        if (ai.y + PADDLE_H / 2 < targetY) ai.y += ai.speed;
+        else if (ai.y + PADDLE_H / 2 > targetY) ai.y -= ai.speed;
+      } else {
+        // Move AI paddle back toward center if ball is going away
+        if (ai.y + PADDLE_H / 2 < H / 2) ai.y += ai.speed * 0.5;
+        else if (ai.y + PADDLE_H / 2 > H / 2) ai.y -= ai.speed * 0.5;
+      }
+
+      // Clamp within bounds
+      ai.y = Math.min(Math.max(0, ai.y), H - PADDLE_H);
+    }
+
+    function updateAIAdaptation() {
+      if (rally > 4) {
+        ai.precision = Math.min(ai.maxPrecision, ai.precision + 0.04);
+        ai.speed = Math.min(ai.maxSpeed, ai.speed + 0.2);
+      } else {
+        ai.precision = Math.max(DIFFICULTY_LEVELS[gameState.difficulty].aiPrecision * 0.8, ai.precision - 0.01);
+        ai.speed = Math.max(DIFFICULTY_LEVELS[gameState.difficulty].aiSpeed * 0.8, ai.speed - 0.1);
+      }
+    }
+
+    function draw() {
+      const W = gameState.width;
+      const H = gameState.height;
+      const PW = gameState.paddleWidth;
+      const PH = gameState.paddleHeight;
+      const BS = gameState.ballSize;
+      const PX = gameState.playerX;
+      const AX = gameState.aiX;
+      
+      // Background
+      drawRect(0, 0, W, H, '#000');
+      drawNet();
+
+      // Paddles
+      drawRect(PX, player.y, PW, PH, '#0f0');
+      drawRect(AX, ai.y, PW, PH, '#f33');
+
+      // Ball
+      drawRect(ball.x, ball.y, BS, BS, '#fff');
+    }
+
+    function update() {
+      const W = gameState.width;
+      const H = gameState.height;
+      const PW = gameState.paddleWidth;
+      const PH = gameState.paddleHeight;
+      const BS = gameState.ballSize;
+      const PX = gameState.playerX;
+      const AX = gameState.aiX;
+
+      // Move ball
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      // Ball collision with top/bottom
+      if (ball.y <= 0 || ball.y + BS >= H) {
+        ball.vy = -ball.vy;
+        ball.y = Math.max(0, Math.min(ball.y, H - BS));
+      }
+
+      // Ball collision with player paddle
+      if (ball.x <= PX + PW 
+          && ball.y + BS >= player.y
+          && ball.y <= player.y + PH) {
+        if (ball.vx < 0) {
+          ball.x = PX + PW;
+          let hitPos = (ball.y + BS / 2 - (player.y + PH / 2)) / (PH / 2);
+          let angle = hitPos * Math.PI / 4;
+          let speed = (3.5 + rallyAcceleration * rally) * ballSpeedMultiplier;
+          ball.vx = speed * Math.cos(angle);
+          ball.vy = speed * Math.sin(angle);
+          rally++;
+          lastTouchBy = 'player';
+          updateAIAdaptation();
+        }
+      }
+
+      // Ball collision with AI paddle
+      if (ball.x + BS >= AX 
+          && ball.y + BS >= ai.y
+          && ball.y <= ai.y + PH) {
+        if (ball.vx > 0) {
+          ball.x = AX - BS;
+          let hitPos = (ball.y + BS / 2 - (ai.y + PH / 2)) / (PH / 2);
+          let angle = hitPos * Math.PI / 4;
+          let speed = (3.5 + rallyAcceleration * rally) * ballSpeedMultiplier;
+          ball.vx = -speed * Math.cos(angle);
+          ball.vy = speed * Math.sin(angle);
+          rally++;
+          lastTouchBy = 'ai';
+          updateAIAdaptation();
+        }
+      }
+
+      // Score check: ball left or right edge
+      if (ball.x < 0) {
+        ai.score++;
+        scoreboard.textContent = `Player: ${player.score}  |  AI: ${ai.score}`;
+        resetBall('ai');
+      } else if (ball.x + BS > W) {
+        player.score++;
+        scoreboard.textContent = `Player: ${player.score}  |  AI: ${ai.score}`;
+        resetBall('player');
+      }
+
+      aiMove();
+    }
+
+    function loop() {
+      if (!isGameRunning) return;
+      update();
+      draw();
+      gameLoopId = requestAnimationFrame(loop);
+    }
+
+    // Mouse controls
+    canvas.addEventListener('mousemove', function (evt) {
+      if (!isGameRunning) return;
+      const rect = canvas.getBoundingClientRect();
+      const mouseY = evt.clientY - rect.top;
+      player.y = Math.min(Math.max(0, mouseY - gameState.paddleHeight / 2), gameState.height - gameState.paddleHeight);
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (isGameRunning) {
+        resizeCanvas();
+      }
+    });
+
+    // ESC key to go back to menu
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && isGameRunning) {
+        isGameRunning = false;
+        backToMenu();
+      }
+    });
+  </script>
+</body>
+</html>
